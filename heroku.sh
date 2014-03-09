@@ -6,3 +6,7 @@ if [[ "$1" == "" ]]; then
 else
   git push heroku $1:master;
 fi
+
+if [[ "$APP_URL" -ne "" ]]; then
+  open "$APP_URL";
+fi
