@@ -1,16 +1,33 @@
 #!/usr/bin/env ruby
 require 'aws-sdk'
 def import_all_impressions(bucket_name)
-  RawImpressions.new(bucket_name)
 end
 
 class RawImpressions
+  attr_reader :bucket
   def initialize(bucket_name)
     s3 = AWS::S3.new
     bucket = s3.buckets[bucket_name]
+    @bucket = bucket
+  end
+  def each
     bucket.objects.with_prefix('raw-impressions/').each do |i|
+      yield self,i
+    end
+  end
+  def archive(i)
     new_name = i.key.sub('raw-impressions/','archived-impressions/')
     i.move_to(new_name)
+  end
+  include Enumerable
+end
+
+def process_raw_impressions(bucket,i)
+    bucket.archive(i)
+end
+def import_all_impressions(bucket_name)
+  RawImpressions.new(bucket_name).each do|bucket, i|
+    process_raw_impressions(bucket,i)
   end
 end
 at_exit do
