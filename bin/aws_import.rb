@@ -57,6 +57,12 @@ at_exit do
            :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
            :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
 
+
+require 'erb'
+ActiveRecord::Base.configurations= YAML::load(ERB.new(File.read(File.expand_path('../config/database.yml',__FILE__))).result(binding))
+ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
+
+    CreatePimAdImpressions.up if %w(development test).include?(ENV['RAILS_ENV'])
     import_all_impressions(ENV['AWS_S3_BUCKET'])
     
   end
