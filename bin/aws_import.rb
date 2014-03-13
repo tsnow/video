@@ -57,8 +57,25 @@ def process_raw_impressions(bucket,i)
     worked, errored = PimAdImpressions.store_impressions(items)
     bucket.archive(i)
   end
+rescue => e
+  @errors.push([i,e])
+  log_impression_processing_failed(i,errored)
+else
+  log_impression_processing(i, worked,errored)
 end
+
+def log_impressions_starting
+  puts "raw_impressions_key,inserted,failed"
 end
+
+def log_impression_processing(i, worked,errored)
+  puts "#{i.key.inspect},#{worked.length},#{errored.length}"
+end
+
+def log_impression_processing_failed(i,errored)
+  puts "#{i.key.inspect},failed,#{errored.length}"
+end
+
 def import_all_impressions(bucket_name)
   RawImpressions.new(bucket_name).each do|bucket, i|
     process_raw_impressions(bucket,i)
