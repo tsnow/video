@@ -22,6 +22,7 @@ group :production do
 	gem 'unicorn'
 end
 
+gem 'aws-sdk'
 gem 'jbuilder', '~> 1.2'
 gem 'jquery-rails'
 gem 'rails', '4.0.0'
