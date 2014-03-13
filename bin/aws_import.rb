@@ -17,6 +17,19 @@ end
       
 
 class PimAdImpressions < ActiveRecord::Base
+  def self.store_impressions(impressions)
+    worked = []
+    ActiveRecord::Base.transaction do
+      impressions.map{|i|
+        i['played_at'] = Time.at(i['played_at']).utc
+        worked.push self.create(i)
+      end
+    end
+    errored = []
+    return [worked,errored] 
+  rescue => e # TODO: error handling
+    raise # until error handling
+  end
 end
 
 class RawImpressions
@@ -39,7 +52,12 @@ class RawImpressions
 end
 
 def process_raw_impressions(bucket,i)
+  ActiveRecord::Base.transaction do
+    items = JSON.parse(i.read)['collection']['items']
+    worked, errored = PimAdImpressions.store_impressions(items)
     bucket.archive(i)
+  end
+end
 end
 def import_all_impressions(bucket_name)
   RawImpressions.new(bucket_name).each do|bucket, i|
