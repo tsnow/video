@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+puts "hello world"
 require 'aws-sdk'
 require 'active_record'
 class CreatePimAdImpressions < ActiveRecord::Migration
@@ -19,16 +20,24 @@ end
 class PimAdImpressions < ActiveRecord::Base
   def self.store_impressions(impressions)
     worked = []
+    errored = []
     ActiveRecord::Base.transaction do
-      impressions.map{|i|
-        i['played_at'] = Time.at(i['played_at']).utc
-        worked.push self.create(i)
+      impressions.each do |i|
+        i['played_at'] = Time.parse(i['played_at']).utc
+        imp = self.create(i)
+        puts imp.inspect
+        #we want to send the row back and the errors
+        if imp.errors.present?
+          errored.push [i.to_json, imp.errors]
+        else
+          worked.push imp
+        end 
       end
     end
-    errored = []
+    
     return [worked,errored] 
-  rescue => e # TODO: error handling
-    raise # until error handling
+  # rescue => e # TODO: error handling
+  #   raise e # until error handling
   end
 end
 
@@ -48,6 +57,7 @@ class RawImpressions
   end
   def each
     bucket.objects.with_prefix('raw-impressions/').each do |i|
+      next if i.key[-1] == "/"
       yield self,i
     end
   end
@@ -59,16 +69,36 @@ class RawImpressions
 end
 
 def process_raw_impressions(bucket,i)
+  #store a metadata file that includes # of rows that should have been entered into the db?
   ActiveRecord::Base.transaction do
+    puts i.read
+    puts i.inspect
     items = JSON.parse(i.read)['collection']['items']
-    worked, errored = PimAdImpressions.store_impressions(items)
-    bucket.archive(i)
+    puts items
+    puts "==============="
+    total_to_process = items.count
+    imps = PimAdImpressions.store_impressions(items)
+    worked = imps[0]
+    errored = imps[1]
+    if worked.count == items.count
+      bucket.archive(i)
+      log_impression_processing(i, worked,errored)
+    else
+      #if a particular file fails, we want to log the errors
+      #we probably want to move the file to a different dir, but let's leave it here now
+      log_impression_processing_failed(i,errored)
+      new_name = i.key.sub('raw-impressions/','impressions-errors/')
+      bucket.bucket.objects.create("#{new_name}.err","worked: #{worked.count}\n errored: #{errored.count}\n error data: #{errored.to_yaml}")
+  
+      #  Do we want to allow the rows to be imported that succeeded?
+    end
+    #bucket.archive(i)    
   end
-rescue => e
-  @errors.push([i,e])
-  log_impression_processing_failed(i,errored)
-else
-  log_impression_processing(i, worked,errored)
+#rescue => e
+  #@errors.push([i,e])
+#  log_impression_processing_failed(i,errored)
+#else
+#  log_impression_processing(i, worked,errored)
 end
 
 def log_impressions_starting
@@ -85,12 +115,21 @@ end
 
 def import_all_impressions(bucket_name)
   RawImpressions.new(bucket_name).each do|bucket, i|
+    puts "bucket #{bucket.inspect}"
+    puts "i: #{i.key}"
+#    require 'irb'
+#    IRB.start
     process_raw_impressions(bucket,i)
   end
 end
-at_exit do
-  if $1 === __FILE__
 
+# not sure why we are doing this...
+at_exit do
+  # or this...
+  # if $1 === __FILE__
+  puts "__FILE__ #{__FILE__}"
+
+    puts "starting"
     required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
 
     fail("Please supply #{required_env.join(', ')}") unless required_env.all?{|i|ENV[i]}
@@ -99,13 +138,17 @@ at_exit do
            :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
            :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
 
-
+    puts "required aws"
 require 'erb'
-ActiveRecord::Base.configurations= YAML::load(ERB.new(File.read(File.expand_path('../config/database.yml',__FILE__))).result(binding))
+ActiveRecord::Base.configurations= YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
 ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
 
-    CreatePimAdImpressions.up if %w(development test).include?(ENV['RAILS_ENV'])
+    puts "creating db tables"
+    #this is just a script outside the context of rails now
+    CreatePimAdImpressions.up # if %w(development test).include?(ENV['RAILS_ENV'])
+    puts "about to import"
     import_all_impressions(ENV['AWS_S3_BUCKET'])
+    puts "finish import"
     
-  end
+  #end
 end
