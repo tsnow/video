@@ -117,7 +117,12 @@ end
   def run?
     File.expand_path($0) == File.expand_path(__FILE__)
   end
-  def run
+
+  def ar_config
+     YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
+  end
+  def connect_aws
+     
     required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
 
     fail("Please supply #{required_env.join(', ')}") unless required_env.all?{|i|ENV[i]}
@@ -125,10 +130,17 @@ end
     AWS.config(
            :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
            :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
-require 'erb'
-ActiveRecord::Base.configurations= YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
-ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
     CreatePimAdImpressions.up # if %w(development test).include?(ENV['RAILS_ENV'])
+  end
+  def connect_ar
+	require 'erb'
+	ActiveRecord::Base.configurations= ar_config
+	ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
+  def connect
+    connect_aws
+    connect_ar
+  end
+  def run
     import_all_impressions(ENV['AWS_S3_BUCKET'])
   end
 end
@@ -136,6 +148,7 @@ end
 at_exit do
   runner = ImportRunner.new
   if runner.run?
-     runner.run
+    runner.connect
+    runner.run
   end
 end
