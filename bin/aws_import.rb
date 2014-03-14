@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
-require 'aws-sdk'
 require 'active_record'
+require 'aws-sdk'
 class CreatePimAdImpressions < ActiveRecord::Migration
   def self.up
     drop_table :pim_ad_impressions if ActiveRecord::Base.connection.table_exists? 'pim_ad_impressions'
