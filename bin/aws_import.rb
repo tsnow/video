@@ -66,7 +66,7 @@ class RawImpressions
   end
   include Enumerable
 end
-
+class ImportRunner
 def process_raw_impressions(bucket,i)
   #store a metadata file that includes # of rows that should have been entered into the db?
   ActiveRecord::Base.transaction do
@@ -113,8 +113,11 @@ def import_all_impressions(bucket_name)
   end
 end
 
-at_exit do
 
+  def run?
+    File.expand_path($0) == File.expand_path(__FILE__)
+  end
+  def run
     required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
 
     fail("Please supply #{required_env.join(', ')}") unless required_env.all?{|i|ENV[i]}
@@ -127,4 +130,12 @@ ActiveRecord::Base.configurations= YAML::load(ERB.new(File.read(File.expand_path
 ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
     CreatePimAdImpressions.up # if %w(development test).include?(ENV['RAILS_ENV'])
     import_all_impressions(ENV['AWS_S3_BUCKET'])
+  end
+end
+
+at_exit do
+  runner = ImportRunner.new
+  if runner.run?
+     runner.run
+  end
 end
