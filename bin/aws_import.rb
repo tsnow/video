@@ -72,9 +72,7 @@ def process_raw_impressions(bucket,i)
   ActiveRecord::Base.transaction do
     items = JSON.parse(i.read)['collection']['items']
     total_to_process = items.count
-    imps = PimAdImpressions.store_impressions(items)
-    worked = imps[0]
-    errored = imps[1]
+    worked, errored = PimAdImpressions.store_impressions(items)
     if worked.count == items.count
       bucket.archive(i)
       log_impression_processing(i, worked,errored)
