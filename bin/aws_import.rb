@@ -51,7 +51,7 @@ class RawImpressions
     raise ArgumentError.new("Not a pim_id: #{pim_id}") unless Integer(pim_id)
     raise ArgumentError.new("No file body supplied: #{file}") unless file && file.respond_to?(:read)
     raise ArgumentError.new("File body is not JSON") unless JSON.parse(file.read) && file.rewind
-    name = ["raw_impressions",pim_id,time.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
+    name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
     bucket.objects[name].write(file)
   end
   def each
