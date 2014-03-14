@@ -23,21 +23,27 @@ class PimAdImpressions < ActiveRecord::Base
     errored = []
     ActiveRecord::Base.transaction do
       impressions.each do |i|
-        i['played_at'] = Time.parse(i['played_at']).utc
-        imp = self.create(i)
-        puts imp.inspect
-        #we want to send the row back and the errors
-        if imp.errors.present?
-          errored.push [i.to_json, imp.errors]
-        else
-          worked.push imp
-        end 
+        begin
+          i['played_at'] = Time.parse(i['played_at']).utc
+          imp = self.create(i)
+          puts imp.inspect
+          #we want to send the row back and the errors
+          if imp.errors.present?
+            errored.push [i.to_json, imp.errors]
+          else
+            worked.push imp
+          end 
+        rescue StandardError => e
+          # we catch any StandardError so we can log it, then we want to rollback the entire transaction
+          # because we don't want partial impressions files in the database
+          # Yes, this is hella hacky, we want to log the impression that errored 
+          errored.push [i.to_json, (defined?(imp).try(:errors))]
+          raise ActiveRecord::Rollback
+        end
       end
     end
     
     return [worked,errored] 
-  # rescue => e # TODO: error handling
-  #   raise e # until error handling
   end
 end
 
@@ -51,6 +57,7 @@ class RawImpressions
   def create(pim_id,file, now=Time.now.utc)
     raise ArgumentError.new("Not a pim_id: #{pim_id}") unless Integer(pim_id)
     raise ArgumentError.new("No file body supplied: #{file}") unless file && file.respond_to?(:read)
+    #do we want to ensure it's not only JSON, but the Collection+JSON format?
     raise ArgumentError.new("File body is not JSON") unless JSON.parse(file.read) && file.rewind
     name = ["raw_impressions",pim_id,time.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
     bucket.objects[name].write(file)
@@ -58,6 +65,7 @@ class RawImpressions
   def each
     bucket.objects.with_prefix('raw-impressions/').each do |i|
       next if i.key[-1] == "/"
+      # alternatively next if i.key[-4] != ".json" #if we want to ensure all files are json
       yield self,i
     end
   end
@@ -65,40 +73,42 @@ class RawImpressions
     new_name = i.key.sub('raw-impressions/','archived-impressions/')
     i.move_to(new_name)
   end
+  def quarantine(i)
+    new_name = i.key.sub('raw-impressions/','quarantined-impressions/')
+    i.move_to(new_name)    
+  end
+  def log_errors(i, worked, errored)
+    new_name = i.key.sub('raw-impressions/','impressions-errors/')
+    bucket.objects.create("#{new_name}.err","worked: #{worked.count}\n errored: #{errored.count}\n error data: #{errored.to_yaml}")
+  end
   include Enumerable
 end
 
 def process_raw_impressions(bucket,i)
   #store a metadata file that includes # of rows that should have been entered into the db?
+  worked = []
+  errored = []
   ActiveRecord::Base.transaction do
-    puts i.read
-    puts i.inspect
-    items = JSON.parse(i.read)['collection']['items']
-    puts items
-    puts "==============="
-    total_to_process = items.count
-    imps = PimAdImpressions.store_impressions(items)
-    worked = imps[0]
-    errored = imps[1]
-    if worked.count == items.count
-      bucket.archive(i)
-      log_impression_processing(i, worked,errored)
-    else
-      #if a particular file fails, we want to log the errors
-      #we probably want to move the file to a different dir, but let's leave it here now
-      log_impression_processing_failed(i,errored)
-      new_name = i.key.sub('raw-impressions/','impressions-errors/')
-      bucket.bucket.objects.create("#{new_name}.err","worked: #{worked.count}\n errored: #{errored.count}\n error data: #{errored.to_yaml}")
-  
-      #  Do we want to allow the rows to be imported that succeeded?
+    if !i.read.blank? #in case it's not actually a file, we skip it
+      items = JSON.parse(i.read)['collection']['items']
+      total_to_process = items.count
+      worked, errored = PimAdImpressions.store_impressions(items)
+      if worked.count == items.count # we worked off all the ones we
+        bucket.archive(i)
+        log_impression_processing(i, worked,errored)
+      else
+        #if a particular file fails, we want to log the errors
+        #we probably want to move the file to a different dir, but let's leave it here now
+        log_impression_processing_failed(i,errored)
+        bucket.quarantine(i)
+        bucket.log_errors(i, worked, errored)
+      end
     end
-    #bucket.archive(i)    
   end
-#rescue => e
-  #@errors.push([i,e])
-#  log_impression_processing_failed(i,errored)
-#else
-#  log_impression_processing(i, worked,errored)
+rescue StandardError => e
+  bucket.log_errors(i, worked, errored)
+  log_impression_processing_failed(i,errored)
+  raise ActiveRecord::Rollback
 end
 
 def log_impressions_starting
@@ -114,11 +124,9 @@ def log_impression_processing_failed(i,errored)
 end
 
 def import_all_impressions(bucket_name)
-  RawImpressions.new(bucket_name).each do|bucket, i|
+  RawImpressions.new(bucket_name).each do |bucket, i|
     puts "bucket #{bucket.inspect}"
     puts "i: #{i.key}"
-#    require 'irb'
-#    IRB.start
     process_raw_impressions(bucket,i)
   end
 end
