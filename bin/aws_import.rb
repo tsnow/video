@@ -130,17 +130,21 @@ end
     AWS.config(
            :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
            :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
-    CreatePimAdImpressions.up # if %w(development test).include?(ENV['RAILS_ENV'])
   end
   def connect_ar
 	require 'erb'
 	ActiveRecord::Base.configurations= ar_config
-	ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ENV['RAILS_ENV'] ||'development'])
+	ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[deploy_env])
+  end
+  def deploy_env
+    ENV['RAILS_ENV'] || 'development'
+  end
   def connect
     connect_aws
     connect_ar
   end
   def run
+    CreatePimAdImpressions.up if %w(development test).include?(deploy_env)
     import_all_impressions(ENV['AWS_S3_BUCKET'])
   end
 end
