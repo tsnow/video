@@ -1,6 +1,13 @@
 #!/usr/bin/env ruby
 require 'active_record'
 require 'aws-sdk'
+require 'multi_json'
+
+require 'logger'
+AWS.config(:logger => Logger.new($stdout), :log_level => :debug)
+
+
+
 class CreatePimAdImpressions < ActiveRecord::Migration
   def self.up
     drop_table :pim_ad_impressions if ActiveRecord::Base.connection.table_exists? 'pim_ad_impressions'
@@ -13,9 +20,9 @@ class CreatePimAdImpressions < ActiveRecord::Migration
     end
   end
 end
-  
-class Batch < Array
 
+class Batch < Array
+  
   def self.transaction
     import = new
     begin
@@ -71,16 +78,16 @@ class ImpressionBatch < Batch
     error(@current, e) 
     return self
   end
-
+  
   
   def store_impression(i)
-        i['played_at'] = Time.parse(i['played_at']).utc
+    i['played_at'] = Time.parse(i['played_at']).utc
     imp = PimAdImpression.create(i)
-        if imp.errors.present?
+    if imp.errors.present?
       error i, imp.errors
-        else
+    else
       push imp
-        end 
+    end 
   rescue => e
     error i, e
   end
@@ -117,29 +124,29 @@ class RawImpressions
     new_name = i.key.sub('raw-impressions/','impressions-errors/')
     bucket.objects.create("#{new_name}.err",data)
   end
-    
+  
   include Enumerable
 end
 
 class ImportRunner
   def process_raw_impressions(bucket,i, import=ImpressionBatch.new)
-  #store a metadata file that includes # of rows that should have been entered into the db?
+    #store a metadata file that includes # of rows that should have been entered into the db?
     items = JSON.parse(i.read)['collection']['items']
     
     import.store_impressions(items)
     begin
       if import.errored.empty? && import.worked.count == items.count
-      bucket.archive(i)
-    else
-      #if a particular file fails, we want to log the errors
-      #we probably want to move the file to a different dir, but let's leave it here now
-      new_name = i.key.sub('raw-impressions/','impressions-errors/')
+        bucket.archive(i)
+      else
+        #if a particular file fails, we want to log the errors
+        #we probably want to move the file to a different dir, but let's leave it here now
+        new_name = i.key.sub('raw-impressions/','impressions-errors/')
         bucket.errchive(i,<<-END
 worked: #{import.worked.count}
 errored: #{import.errored.count}
 error data: #{import.errored.to_yaml}
 END
-                                     )
+                        )
         #Circuit breaker?
       end
     rescue => e # *should* only happen when an s3 outage occurs.
@@ -148,7 +155,7 @@ END
     end
     log_impression_processing(i,import)
   end
-
+  
   def log_impressions_starting
     puts "raw_impressions_key,inserted,failed,total"
   end
@@ -156,39 +163,39 @@ END
   def log_impression_processing(i, import)
     puts "#{i.key.inspect},#{import.worked.count},#{import.errored.count},#{import.total.count}"
   end
-
+  
   def log_s3_failure(i,e)
     $stderr.puts "communication_failure key=#{i.key.inspect} exception=#{e.class.to_s.inspect} message=#{e.inspect} backtrace=#{e.backtrace.inspect}"
   end
   
-def import_all_impressions(bucket_name)
-  RawImpressions.new(bucket_name).each do|bucket, i|
-    process_raw_impressions(bucket,i)
+  def import_all_impressions(bucket_name)
+    RawImpressions.new(bucket_name).each do|bucket, i|
+      process_raw_impressions(bucket,i)
+    end
   end
-end
-
-
+  
+  
   def run?
     File.expand_path($0) == File.expand_path(__FILE__)
   end
-
+  
   def ar_config
-     YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
+    YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
   end
   def connect_aws
-     
+    
     required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
-
+    
     fail("Please supply #{required_env.join(', ')}") unless required_env.all?{|i|ENV[i]}
-
+    
     AWS.config(
-           :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
-           :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
+               :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
+               :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
   end
   def connect_ar
-	require 'erb'
-	ActiveRecord::Base.configurations= ar_config
-	ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[deploy_env])
+    require 'erb'
+    ActiveRecord::Base.configurations= ar_config
+    ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[deploy_env])
   end
   def deploy_env
     ENV['RAILS_ENV'] || 'development'
@@ -210,3 +217,4 @@ at_exit do
     runner.run
   end
 end
+e
