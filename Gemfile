@@ -23,6 +23,7 @@ group :production do
 end
 
 gem 'aws-sdk'
+gem 'goliath'
 gem 'jbuilder', '~> 1.2'
 gem 'jquery-rails'
 gem 'rails', '4.0.0'
