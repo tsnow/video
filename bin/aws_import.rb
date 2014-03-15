@@ -104,6 +104,11 @@ class RawImpressions
     new_name = i.key.sub('raw-impressions/','archived-impressions/')
     i.move_to(new_name)
   end
+  def errchive(i, data)
+    new_name = i.key.sub('raw-impressions/','impressions-errors/')
+    bucket.objects.create("#{new_name}.err",data)
+  end
+    
   include Enumerable
 end
 class ImportRunner
@@ -121,9 +126,12 @@ def process_raw_impressions(bucket,i)
       #we probably want to move the file to a different dir, but let's leave it here now
       log_impression_processing_failed(i,errored)
       new_name = i.key.sub('raw-impressions/','impressions-errors/')
-      bucket.bucket.objects.create("#{new_name}.err","worked: #{worked.count}\n errored: #{errored.count}\n error data: #{errored.to_yaml}")
-  
-      #  Do we want to allow the rows to be imported that succeeded?
+        bucket.errchive(i,<<-END
+worked: #{import.worked.count}
+errored: #{import.errored.count}
+error data: #{import.errored.to_yaml}
+END
+                                     )
     end
   end
 #rescue => e
