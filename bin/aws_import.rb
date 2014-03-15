@@ -97,21 +97,39 @@ class PimAdImpression < ActiveRecord::Base
 end
 
 class RawImpressions
-  attr_reader :bucket
+  attr_reader :adapter, :bucket
   def initialize(bucket_name)
-    s3 = AWS::S3.new
-    bucket = s3.buckets[bucket_name]
-    @bucket = bucket
+    @adapter = s3_adapter(bucket_name)
   end
   def create(pim_id,file, now=Time.now.utc)
     raise ArgumentError.new("Not a pim_id: #{pim_id}") unless Integer(pim_id)
     raise ArgumentError.new("No file body supplied: #{file}") unless file && file.respond_to?(:read)
     raise ArgumentError.new("File body is not JSON") unless JSON.parse(file.read) && file.rewind
     name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
-    bucket.objects[name].write(file)
+
+    adapter.store(name, file)
+  end
+  class AWSAdapter
+    attr_reader :bucket
+    def initialize(bucket_name)
+      s3 = AWS::S3.new
+      @bucket = s3.buckets[bucket_name]
+    end
+    def store(name,file)
+      bucket.objects[name].write(file)
+    end
+    def objects(prefix)
+      bucket.objects.with_prefix(prefix)
+    end
+
+  end
+  def s3_adapter(bucket_name)
+      @adapter = AWSAdapter.new(bucket_name)
+      @bucket = @adapter.bucket
+    @adapter
   end
   def each
-    bucket.objects.with_prefix('raw-impressions/').each do |i|
+    adapter.objects('raw-impressions/').each do |i|
       next if i.key[-1] == "/"
       yield self,i
     end
