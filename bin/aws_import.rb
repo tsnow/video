@@ -56,28 +56,37 @@ class Batch < Array
   end
 end
 
-class PimAdImpressions < ActiveRecord::Base
-  def self.store_impressions(impressions)
-    worked = []
-    errored = []
+class ImpressionBatch < Batch
+  def store_impressions(impressions)
     ActiveRecord::Base.transaction do
       impressions.each do |i|
-        i['played_at'] = Time.parse(i['played_at']).utc
-        imp = self.create(i)
-        puts imp.inspect
-        #we want to send the row back and the errors
-        if imp.errors.present?
-          errored.push [i.to_json, imp.errors]
-        else
-          worked.push imp
-        end 
+        @current = i
+        store_impression(i)
       end
     end
     
-    return [worked,errored] 
-  # rescue => e # TODO: error handling
-  #   raise e # until error handling
+    return self
+  rescue => e 
+    rollback
+    error(@current, e) 
+    return self
   end
+
+  
+  def store_impression(i)
+        i['played_at'] = Time.parse(i['played_at']).utc
+    imp = PimAdImpression.create(i)
+        if imp.errors.present?
+      error i, imp.errors
+        else
+      push imp
+        end 
+  rescue => e
+    error i, e
+  end
+end
+
+class PimAdImpression < ActiveRecord::Base
 end
 
 class RawImpressions
@@ -111,20 +120,19 @@ class RawImpressions
     
   include Enumerable
 end
+
 class ImportRunner
-def process_raw_impressions(bucket,i)
+  def process_raw_impressions(bucket,i, import=ImpressionBatch.new)
   #store a metadata file that includes # of rows that should have been entered into the db?
-  ActiveRecord::Base.transaction do
     items = JSON.parse(i.read)['collection']['items']
-    total_to_process = items.count
-    worked, errored = PimAdImpressions.store_impressions(items)
-    if worked.count == items.count
+    
+    import.store_impressions(items)
+    begin
+      if import.errored.empty? && import.worked.count == items.count
       bucket.archive(i)
-      log_impression_processing(i, worked,errored)
     else
       #if a particular file fails, we want to log the errors
       #we probably want to move the file to a different dir, but let's leave it here now
-      log_impression_processing_failed(i,errored)
       new_name = i.key.sub('raw-impressions/','impressions-errors/')
         bucket.errchive(i,<<-END
 worked: #{import.worked.count}
@@ -132,27 +140,27 @@ errored: #{import.errored.count}
 error data: #{import.errored.to_yaml}
 END
                                      )
+        #Circuit breaker?
+      end
+    rescue => e # *should* only happen when an s3 outage occurs.
+      import.rollback
+      log_s3_failure(i,e)
     end
+    log_impression_processing(i,import)
   end
-#rescue => e
-  #@errors.push([i,e])
-#  log_impression_processing_failed(i,errored)
-#else
-#  log_impression_processing(i, worked,errored)
-end
 
-def log_impressions_starting
-  puts "raw_impressions_key,inserted,failed"
-end
+  def log_impressions_starting
+    puts "raw_impressions_key,inserted,failed,total"
+  end
+  
+  def log_impression_processing(i, import)
+    puts "#{i.key.inspect},#{import.worked.count},#{import.errored.count},#{import.total.count}"
+  end
 
-def log_impression_processing(i, worked,errored)
-  puts "#{i.key.inspect},#{worked.length},#{errored.length}"
-end
-
-def log_impression_processing_failed(i,errored)
-  puts "#{i.key.inspect},failed,#{errored.length}"
-end
-
+  def log_s3_failure(i,e)
+    $stderr.puts "communication_failure key=#{i.key.inspect} exception=#{e.class.to_s.inspect} message=#{e.inspect} backtrace=#{e.backtrace.inspect}"
+  end
+  
 def import_all_impressions(bucket_name)
   RawImpressions.new(bucket_name).each do|bucket, i|
     process_raw_impressions(bucket,i)
