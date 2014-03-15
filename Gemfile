@@ -23,8 +23,13 @@ group :production do
 end
 
 gem 'aws-sdk'
+gem 'em-http-request'
+gem 'em-synchrony'
+gem 'goliath'
 gem 'jbuilder', '~> 1.2'
 gem 'jquery-rails'
+gem 'multi_json'
 gem 'rails', '4.0.0'
 gem 's3_direct_upload'
 gem 'turbolinks'
+gem 'uber-s3'
