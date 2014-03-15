@@ -109,6 +109,23 @@ class RawImpressions
 
     adapter.store(name, file)
   end
+  class UberS3Adapter
+    attr_reader :s3
+    def initialize(bucket_name)
+      @s3 =  UberS3.new({
+                          :access_key         => ENV['AWS_ACCESS_KEY_ID'],
+                          :secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY'],
+                          :bucket             => bucket_name,
+                          :adapter            => :em_http_fibered
+                        })
+    end
+    def store(name,file)
+      s3.store(name, file.read)
+    end
+    def objects(prefix)
+      s3.objects(prefix)
+    end
+  end
   class AWSAdapter
     attr_reader :bucket
     def initialize(bucket_name)
@@ -124,8 +141,12 @@ class RawImpressions
 
   end
   def s3_adapter(bucket_name)
+    if defined?(::UberS3)
+      @adapter = UberS3Adapter.new(bucket_name)
+    else
       @adapter = AWSAdapter.new(bucket_name)
       @bucket = @adapter.bucket
+    end
     @adapter
   end
   def each
