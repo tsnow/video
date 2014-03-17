@@ -2,8 +2,30 @@ load File.expand_path('../../config/boot.rb',__FILE__)
 require File.expand_path('../../bin/aws_import',__FILE__)
 
 require 'goliath'
+require 'multi_json'
 require 'uber-s3'
 require 'uber-s3/connection/em_http_fibered'
+
+
+
+
+class PimJson
+  def initialize(status,errors)
+    @status = status
+    @errors = errors
+  end
+  def error_clause
+    return {} if @errors.empty?
+    return {"errors" => @errors}
+  end
+  def result_clause
+    {"result"=>{"status"=> @status.to_s}}
+  end
+  def to_json
+    MultiJson.dump(result_clause.merge(error_clause))
+  end
+end
+
 class Impressions
   attr_reader :errors,:status
   def initialize(pim_id, body)
@@ -50,10 +72,26 @@ class Intake < Goliath::API
   rescue => e
     return [:failure, imp.errors.push(e.to_s)]
   end
+
+  def failure(failures)
+    [500,{}, PimJson.new(:failure,failures).to_json]
+  end
+  def success
+    [200,{}, PimJson.new(:success,[]).to_json]
+  end
+  def decline(errors)
+    [400,{}, PimJson.new(:decline,errors).to_json]
+  end
+
   def response(env)
-    bucket = RawImpressions.new(ENV['AWS_S3_BUCKET'])
-    count = bucket.count
     status, errors = upload_impressions(env)
-    [200, {},"Items: #{count}"]
+    case status
+    when :success then
+      success
+    when :failure then
+      failure(errors)
+    when :decline then
+      decline(errors)
+    end
   end
 end
