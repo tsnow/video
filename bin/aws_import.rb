@@ -112,7 +112,7 @@ class RawImpressions
       
     end
     raise ArgumentError.new("File body is not JSON") unless json
-    name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
+    name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%M:%S.json")].join('/')
 
     adapter.store(name, file)
     name
