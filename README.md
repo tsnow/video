@@ -2,7 +2,7 @@ video
 =====
 
 Video Upload Prototype
-This application was a result of [this](https://github.com/waynehoover/s3_direct_upload/issues/108). There was no simple example on how to use the `s3_direct_upload` [Gem for Rails](https://github.com/waynehoover/s3_direct_upload), so I decided to make one.
+This application was a result of [this](https://github.com/waynehoover/s3_direct_upload/issues/108). A simple example on how to use the `s3_direct_upload` [Gem for Rails](https://github.com/waynehoover/s3_direct_upload)
 
 
 Getting Started
@@ -35,7 +35,12 @@ Getting Started
   export AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
   ``` 
 
-5. **Everything's done!** Start your rails server, and navigate to `http://0.0.0.0:3000` to see the app in action. 
+Fill these in in a file called `./.env`. `cp ./example.env ./.env` for
+a quicker start.
+
+
+5. **Everything's done!** Start your rails server, `bundle exec foreman start` and 
+navigate to `http://0.0.0.0:9100` to see the app in action. 
 
 
 
