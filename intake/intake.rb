@@ -6,8 +6,11 @@ require 'uber-s3'
 require 'uber-s3/connection/em_http_fibered'
 
 class Intake < Goliath::API
+  
   def response(env)
-    count = RawImpressions.new(ENV['AWS_S3_BUCKET']).count
+    bucket = RawImpressions.new(ENV['AWS_S3_BUCKET'])
+    bucket.create(1000, env['rack.input'])
+    count = bucket.count
     [200, {},"Items: #{count}"]
   end
 end
