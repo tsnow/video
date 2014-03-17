@@ -1,0 +1,78 @@
+require File.expand_path('../../../app/services/impression_batch',__FILE__)
+require File.expand_path('../../../app/models/raw_impressions',__FILE__)
+require File.expand_path('../../../db/migrate/20140317000000_create_pim_ad_impressions',__FILE__)
+class ImportRunner
+  def process_raw_impressions(bucket,i, import=ImpressionBatch.new)
+    #store a metadata file that includes # of rows that should have been entered into the db?
+    items = JSON.parse(i.read)['collection']['items']
+    
+    import.store_impressions(items)
+    begin
+      if import.errored.empty? && import.worked.count == items.count
+        bucket.archive(i)
+      else
+        bucket.quarantine(i)
+        bucket.log_errors(i, import.worked, import.errored)
+        #Circuit breaker?
+      end
+    rescue => e # *should* only happen when an s3 outage occurs.
+      import.rollback
+      log_s3_failure(i,e)
+      #bucket.log_errors(i, import.worked, import.errored) # Probably wouldn't work. Have to think about how to best handle these.
+    end
+    log_impression_processing(i,import)
+  end
+  
+  def log_impressions_starting
+    puts "raw_impressions_key,inserted,failed,total"
+  end
+  
+  def log_impression_processing(i, import)
+    puts "#{i.key.inspect},#{import.worked.count},#{import.errored.count},#{import.total.count}"
+  end
+  
+  def log_s3_failure(i,e)
+    $stderr.puts "communication_failure key=#{i.key.inspect} exception=#{e.class.to_s.inspect} message=#{e.inspect} backtrace=#{e.backtrace.inspect}"
+  end
+  
+  def import_all_impressions(bucket_name)
+    RawImpressions.new(bucket_name).each do |bucket, i|
+      process_raw_impressions(bucket,i)
+    end
+  end
+  
+  
+  def run?
+    File.expand_path($0) == File.expand_path(__FILE__)
+  end
+  
+  def ar_config
+    YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
+  end
+  def connect_aws
+    
+    required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
+    
+    fail("Please supply #{required_env.join(', ')}") unless required_env.all?{|i|ENV[i]}
+    
+    AWS.config(
+               :access_key_id => ENV['AWS_ACCESS_KEY_ID'],
+               :secret_access_key => ENV['AWS_SECRET_ACCESS_KEY'])
+  end
+  def connect_ar
+    require 'erb'
+    ActiveRecord::Base.configurations= ar_config
+    ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[deploy_env])
+  end
+  def deploy_env
+    ENV['RAILS_ENV'] || 'development'
+  end
+  def connect
+    connect_aws
+    connect_ar
+  end
+  def run
+    CreatePimAdImpressions.up if %w(development test).include?(deploy_env)
+    import_all_impressions(ENV['AWS_S3_BUCKET'])
+  end
+end
