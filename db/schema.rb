@@ -11,10 +11,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20131203141819) do
+ActiveRecord::Schema.define(version: 20140317000000) do
 
   create_table "documents", force: true do |t|
-    t.string   "file_url"
+    t.text     "file_url"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "pim_ad_impressions", force: true do |t|
+    t.integer  "pim_id"
+    t.integer  "content_element_id"
+    t.datetime "played_at"
+    t.integer  "volume"
     t.datetime "created_at"
     t.datetime "updated_at"
   end

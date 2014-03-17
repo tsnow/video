@@ -1,4 +1,6 @@
 #!/bin/bash
+
+PORT=9000;
 function setup(){
     cat /dev/null > test_output.log;
 }
@@ -31,12 +33,12 @@ function POST(){
     fi
 }
 setup;
-GET localhost:9000;
-GET localhost:9000/?pim_id=1000;
-POST localhost:9000/?pim_id=1000;
-POST localhost:9000/?pim_id=1000 1.2;
-POST localhost:9000/?pim_id=1000 '{ totally: "JSON" }' ;
-POST localhost:9000/?pim_id=1000 '{ collection: "JSON" }';
-POST localhost:9000/?pim_id=1000 '{ collection: { items: "JSON" } }';
-POST localhost:9000/?pim_id=1000 '{ collection: { items: ["JSON"] } }';
-POST localhost:9000/?pim_id=1000 '{ collection: { items: {} } }';
+GET localhost:$PORT/s3/raw-impressions/;
+GET localhost:$PORT/s3/raw-impressions/?pim_id=1000;
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000;
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 1.2;
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 '{ totally: "JSON" }' ;
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 '{ collection: "JSON" }';
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 '{ collection: { items: "JSON" } }';
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 '{ collection: { items: ["JSON"] } }';
+POST localhost:$PORT/s3/raw-impressions/?pim_id=1000 '{ collection: { items: {} } }';

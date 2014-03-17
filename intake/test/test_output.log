@@ -1,10 +1,22 @@
-# GET localhost:9000
-parse error: Expected string key before ':' at line 1, column 2
-[:error, "ID identifier missing"]
-# GET localhost:9000/?pim_id=1000
-parse error: Expected string key before ':' at line 1, column 2
-[:error, "Invalid request method"]
-# POST localhost:9000/?pim_id=1000
+# GET localhost:9000/s3/raw-impressions/
+{
+  "errors": [
+    "No behaviour is defined for GET raw-impressions"
+  ],
+  "result": {
+    "status": "decline"
+  }
+}
+# GET localhost:9000/s3/raw-impressions/?pim_id=1000
+{
+  "errors": [
+    "No behaviour is defined for GET raw-impressions"
+  ],
+  "result": {
+    "status": "decline"
+  }
+}
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
@@ -13,7 +25,7 @@ parse error: Expected string key before ':' at line 1, column 2
     "status": "decline"
   }
 }
-# POST localhost:9000/?pim_id=1000 1.2
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 1.2
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
@@ -22,7 +34,7 @@ parse error: Expected string key before ':' at line 1, column 2
     "status": "decline"
   }
 }
-# POST localhost:9000/?pim_id=1000 { totally: "JSON" }
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 { totally: "JSON" }
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
@@ -31,7 +43,7 @@ parse error: Expected string key before ':' at line 1, column 2
     "status": "decline"
   }
 }
-# POST localhost:9000/?pim_id=1000 { collection: "JSON" }
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 { collection: "JSON" }
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
@@ -40,7 +52,7 @@ parse error: Expected string key before ':' at line 1, column 2
     "status": "decline"
   }
 }
-# POST localhost:9000/?pim_id=1000 { collection: { items: "JSON" } }
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 { collection: { items: "JSON" } }
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
@@ -49,14 +61,14 @@ parse error: Expected string key before ':' at line 1, column 2
     "status": "decline"
   }
 }
-# POST localhost:9000/?pim_id=1000 { collection: { items: ["JSON"] } }
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 { collection: { items: ["JSON"] } }
 {
   "result": {
-    "key": "raw-impressions/1000/2014-03-17/09:06:13.json",
+    "key": "raw-impressions/1000/2014-03-17/16:12:48.json",
     "status": "success"
   }
 }
-# POST localhost:9000/?pim_id=1000 { collection: { items: {} } }
+# POST localhost:9000/s3/raw-impressions/?pim_id=1000 { collection: { items: {} } }
 {
   "errors": [
     "File body is not Collection+JSON: Must contain root.collection.items[]."
