@@ -40,7 +40,7 @@ class Impressions
     RawImpressions.new(ENV['AWS_S3_BUCKET']).create(@pim_id, @body)
     @status = :success
   rescue ArgumentError => e
-    @errors.push(e)
+    @errors.push(e.to_s)
     @status = :decline
   rescue => e
     # TODO:
