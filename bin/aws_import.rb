@@ -115,6 +115,7 @@ class RawImpressions
     name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
 
     adapter.store(name, file)
+    name
   end
   class UberS3Adapter
     attr_reader :s3
