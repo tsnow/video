@@ -104,7 +104,14 @@ class RawImpressions
   def create(pim_id,file, now=Time.now.utc)
     raise ArgumentError.new("Not a pim_id: #{pim_id}") unless Integer(pim_id)
     raise ArgumentError.new("No file body supplied: #{file}") unless file && file.respond_to?(:read)
-    raise ArgumentError.new("File body is not JSON") unless JSON.parse(file.read) && file.rewind
+    begin
+      data = file.read
+      file.rewind
+      json = JSON.parse(data)
+    rescue => e
+      
+    end
+    raise ArgumentError.new("File body is not JSON") unless json
     name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%m%s.json")].join('/')
 
     adapter.store(name, file)
