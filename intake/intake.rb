@@ -67,9 +67,11 @@ class Intake < Goliath::API
   def upload_impressions(env)
     imp=Impressions.new(params['pim_id'], env['rack.input'])
     imp.publish
-    return [imp.status,imp.errors]
+    return imp
   rescue => e
-    return [:failure, imp.errors.push(e.to_s)]
+    imp.status = :failure
+    imp.errors.push(e.to_s)
+    return imp
   end
 
   def failure(failures)
@@ -83,14 +85,14 @@ class Intake < Goliath::API
   end
 
   def response(env)
-    status, errors = upload_impressions(env)
-    case status
+    imp = upload_impressions(env)
+    case imp.status
     when :success then
       success
     when :failure then
-      failure(errors)
+      failure(imp.errors)
     when :decline then
-      decline(errors)
+      decline(imp.errors)
     end
   end
 end
