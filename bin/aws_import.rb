@@ -108,10 +108,12 @@ class RawImpressions
       data = file.read
       file.rewind
       json = JSON.parse(data)
+      json = json.fetch('collection').fetch('items') # TODO: add test coverage
+      raise ArgumentError.new(json) unless Array === json
     rescue => e
-      
+      json = nil
     end
-    raise ArgumentError.new("File body is not JSON") unless json
+    raise ArgumentError.new("File body is not Collection+JSON: Must contain root.collection.items[].") unless json
     name = ["raw-impressions",pim_id,now.strftime("%Y-%m-%d/%H:%M:%S.json")].join('/')
 
     adapter.store(name, file)
