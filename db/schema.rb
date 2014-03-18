@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20140317000000) do
+ActiveRecord::Schema.define(version: 20140318211350) do
 
   create_table "documents", force: true do |t|
     t.text     "file_url"
@@ -21,9 +21,19 @@ ActiveRecord::Schema.define(version: 20140317000000) do
 
   create_table "pim_ad_impressions", force: true do |t|
     t.integer  "pim_id"
-    t.integer  "content_element_id"
+    t.integer  "campaign_element_id"
     t.datetime "played_at"
     t.integer  "volume"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "upload_files", force: true do |t|
+    t.string   "key"
+    t.string   "bucket"
+    t.string   "etag"
+    t.boolean  "success"
+    t.boolean  "s3_connect_success"
     t.datetime "created_at"
     t.datetime "updated_at"
   end

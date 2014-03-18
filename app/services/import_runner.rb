@@ -1,6 +1,8 @@
 require File.expand_path('../../../app/services/impression_batch',__FILE__)
 require File.expand_path('../../../app/models/raw_impressions',__FILE__)
 require File.expand_path('../../../db/migrate/20140317000000_create_pim_ad_impressions',__FILE__)
+require File.expand_path('../../../db/migrate/20140318211350_create_upload_files.rb',__FILE__)
+
 class ImportRunner
   def process_raw_impressions(bucket,i, import=ImpressionBatch.new)
     #store a metadata file that includes # of rows that should have been entered into the db?
@@ -81,6 +83,7 @@ class ImportRunner
   end
   def run
     CreatePimAdImpressions.up if %w(development test).include?(deploy_env)
+    CreateUploadFiles.up if %w(development test).include?(deploy_env)
     import_all_impressions(ENV['AWS_S3_BUCKET'])
   end
 end
