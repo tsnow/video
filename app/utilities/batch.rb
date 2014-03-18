@@ -1,5 +1,8 @@
 class Batch < Array
   
+  # 
+  # this doesn't appear to be used
+  #
   def self.transaction
     import = new
     begin
@@ -12,6 +15,7 @@ class Batch < Array
   def initialize(*args)
     super(*args)
     @errored = []
+    @dupes = []
     @total = []
   end
   def push(*args)
@@ -21,6 +25,10 @@ class Batch < Array
   def error(item, errors)
     @total.push(item)
     @errored.push(item,errors)
+  end
+  def dupe(item)
+    @total.push(item)
+    @dupes.push(item)
   end
   def errors
     @errored

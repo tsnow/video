@@ -77,14 +77,26 @@ class RawImpressions
       yield self,i
     end
   end
+  
+  #we move from raw impressions to processing impressions first
+  def begin_processing(i)
+    new_name = i.key.sub('raw-impressions/','processing-impressions/')
+    i.move_to(new_name)
+    return self.objects[new_name]
+  end  
+
+  #we move from processing to archive if they work properly
   def archive(i)
-    new_name = i.key.sub('raw-impressions/','archived-impressions/')
+    new_name = i.key.sub('processing-impressions/','archived-impressions/')
     i.move_to(new_name)
   end
+  
+  #we move from processing to quarantine if they have an error
   def quarantine(i)
-    new_name = i.key.sub('raw-impressions/','quarantined-impressions/')
+    new_name = i.key.sub('processing-impressions/','quarantined-impressions/')
     i.move_to(new_name)    
   end
+  
   def log_errors(i, worked, errored)
     new_name = i.key.sub('raw-impressions/','impressions-errors/')
     bucket.objects.create(new_name,<<-END

@@ -12,7 +12,8 @@ class ImpressionBatch < Batch
     
     return self
   rescue => e 
-    rollback
+    # rollback
+    # not sure why we are rolling back here, we're in a transaction already
     error(@current, e) 
     return self
   end
@@ -20,12 +21,18 @@ class ImpressionBatch < Batch
   
   def store_impression(i)
     i['played_at'] = Time.parse(i['played_at']).utc
-    imp = PimAdImpression.create(i)
-    if imp.errors.present?
-      error i, imp.errors
+    # don't want to duplicate imports
+    existing = PimAdImpression.where(:pim_id => i['pim_id'], :played_at => i['played_at'], :campaign_element_id => i['campaign_element_id'])
+    if existing.present?
+      dupe i
     else
-      push imp
-    end 
+      imp = PimAdImpression.create(i)
+      if imp.errors.present?
+        error i, imp.errors
+      else
+        push imp
+      end 
+    end
   rescue => e
     error i, e
   end

@@ -5,18 +5,25 @@ class ImportRunner
   def process_raw_impressions(bucket,i, import=ImpressionBatch.new)
     #store a metadata file that includes # of rows that should have been entered into the db?
     items = JSON.parse(i.read)['collection']['items']
-    
+    i = bucket.begin_processing(i)
     import.store_impressions(items)
     begin
       if import.errored.empty? && import.worked.count == items.count
+        uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => true)
         bucket.archive(i)
       else
+        uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => false)  
         bucket.quarantine(i)
         bucket.log_errors(i, import.worked, import.errored)
         #Circuit breaker?
       end
+      uf.update_attributes(:s3_connect_success => true)
     rescue => e # *should* only happen when an s3 outage occurs.
-      import.rollback
+      # import.rollback
+      # if we were able to import the entire file, we don't need to rollback
+      # we just need to log s3 errors.  These files will be "stuck" in processing
+      # so they won't try to reimport them
+      uf.update_attributes(:s3_connect_success => false)
       log_s3_failure(i,e)
       #bucket.log_errors(i, import.worked, import.errored) # Probably wouldn't work. Have to think about how to best handle these.
     end
@@ -49,6 +56,7 @@ class ImportRunner
   def ar_config
     YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
   end
+  
   def connect_aws
     
     required_env = %w(AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET)
