@@ -8,26 +8,35 @@ class ImportRunner
     #store a metadata file that includes # of rows that should have been entered into the db?
     items = JSON.parse(i.read)['collection']['items']
     i = bucket.begin_processing(i)
+    puts "STORING IMPRESSIONS....."
     import.store_impressions(items)
+    puts "FINISHED STORING IMPRESSIONS"
     begin
-      if import.errored.empty? && import.worked.count == items.count
-        uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => true)
+      if import.errors.empty? && import.worked.count == items.count
+        puts "IMPORT SUCCEEDED, UPLOAD"
+        @uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => true)
+        puts "IMPORT SUCCEEDED, ARCHIVE"
         bucket.archive(i)
       else
-        uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => false)  
+        puts "IMPORT FAILED, UPLOAD"
+        @uf = UploadFile.create(:key => i.key, :bucket => i.bucket.try(:name), :etag => i.etag, :success => false)  
+        puts "IMPORT FAILED, QUARANTINE"        
         bucket.quarantine(i)
-        bucket.log_errors(i, import.worked, import.errored)
+        bucket.log_errors(i, import.worked, import.errors)
         #Circuit breaker?
       end
-      uf.update_attributes(:s3_connect_success => true)
+      @uf.update_attributes(:s3_connect_success => true)
     rescue => e # *should* only happen when an s3 outage occurs.
       # import.rollback
       # if we were able to import the entire file, we don't need to rollback
       # we just need to log s3 errors.  These files will be "stuck" in processing
       # so they won't try to reimport them
-      uf.update_attributes(:s3_connect_success => false)
+      puts "$$$$$$$$$$$$$$$$$$$$$$$$$"
+      raise e
+      puts "$$$$$$$$$$$$$$$$$$$$$$$$$$"
+      @uf.update_attributes(:s3_connect_success => false)
       log_s3_failure(i,e)
-      #bucket.log_errors(i, import.worked, import.errored) # Probably wouldn't work. Have to think about how to best handle these.
+      #bucket.log_errors(i, import.worked, import.errors) # Probably wouldn't work. Have to think about how to best handle these.
     end
     log_impression_processing(i,import)
   end
@@ -37,7 +46,7 @@ class ImportRunner
   end
   
   def log_impression_processing(i, import)
-    puts "#{i.key.inspect},#{import.worked.count},#{import.errored.count},#{import.total.count}"
+    puts "#{i.key.inspect},#{import.worked.count},#{import.errors.count},#{import.total.count}"
   end
   
   def log_s3_failure(i,e)

@@ -82,7 +82,7 @@ class RawImpressions
   def begin_processing(i)
     new_name = i.key.sub('raw-impressions/','processing-impressions/')
     i.move_to(new_name)
-    return self.objects[new_name]
+    return bucket.objects[new_name]
   end  
 
   #we move from processing to archive if they work properly
@@ -100,9 +100,9 @@ class RawImpressions
   def log_errors(i, worked, errored)
     new_name = i.key.sub('raw-impressions/','impressions-errors/')
     bucket.objects.create(new_name,<<-END
-worked: #{import.worked.count}
-errored: #{import.errored.count}
-error data: #{import.errored.to_yaml}
+worked: #{worked.count}
+errored: #{errored.count}
+error data: #{errored.to_yaml}
 END
                           )
   end
