@@ -56,7 +56,12 @@ class ImportRunner
   end
   
   def ar_config
-    YAML::load(ERB.new(File.read(File.expand_path('../../config/database.yml',__FILE__))).result(binding))
+    db_yml = if defined?(Rails)
+      Rails.root.join('config/database.yml')
+    else
+      File.expand_path('../../../config/database.yml',__FILE__)
+    end
+    YAML::load(ERB.new(File.read(db_yml)).result(binding))
   end
   
   def connect_aws
