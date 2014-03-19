@@ -87,6 +87,12 @@ class ImportRunner
     connect_ar
   end
   def run
+    begin
+      AWS::S3.new.buckets.to_a
+    rescue => e
+      $stderr.puts "ImportRunner: Cannot even get the list of buckets from S3. Please make sure ImportRunner#connect has been run. Access Key ID given: #{AWS.config.access_key_id}"
+      raise
+    end
     CreatePimAdImpressions.up if %w(development test).include?(deploy_env)
     CreateUploadFiles.up if %w(development test).include?(deploy_env)
     import_all_impressions(ENV['AWS_S3_BUCKET'])
